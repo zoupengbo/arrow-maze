@@ -1,0 +1,4 @@
+version: 1
+display_name: Arrow Maze UI
+short_description: Project-specific UI design and implementation guidance for the Arrow Maze WeChat Mini Game
+default_prompt: Provide UI design, implementation, and refinement guidance for the current WeChat Mini Game while preserving the existing Canvas visual style.
