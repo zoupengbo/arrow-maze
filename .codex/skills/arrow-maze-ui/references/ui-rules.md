@@ -1,58 +1,72 @@
 # UI Rules
 
-## Visual baseline
+## Visual Baseline
 
-Use the current project aesthetic as the default baseline:
+Use the current project aesthetic as the default:
 
-- Cool indigo or slate background tones
-- Light maze lines and light panel text
-- Accent colors reserved for success, warning, error, and focus states
-- Rounded cards, rounded buttons, and a circular primary play area
-- Simple, readable shapes over decorative flourishes
+- Cool indigo/slate background.
+- Dark translucent HUD and bottom panels.
+- Pale line bodies with strong contrast on the board.
+- Mint/green for active or successful motion.
+- Coral/red for failed or blocked attempts.
+- Rounded panels, soft board frame, and subtle grid texture.
 
-## Color usage
+Do not make the game look like a generic H5 landing page. Keep it game-like, compact, and Canvas-native.
 
-- Primary surfaces: dark blue-gray panels
-- Primary content: near-white text and line work
-- Success / correct route: mint or soft green
-- Warning / attention: warm coral or orange-red
-- Focus / action buttons: brighter cyan or blue accent
-- Keep accent colors sparse so game states remain legible
+## Commercial Quality Goals
 
-## Typography
+- Make the first screen feel like a real published casual game, not a prototype.
+- Use clear hierarchy: title, primary action, progress, and hint copy should each have a clear role.
+- Keep the game board as the hero element; decorative UI should support the puzzle, not compete with it.
+- Make failure and revive states feel helpful and recoverable, not punishing or noisy.
+- Use repeatable component styling so future levels and features feel consistent.
 
-- Favor short text strings and strong hierarchy
-- Title text should be bold and highly readable
-- HUD text should be compact and stable in width
-- Bottom guidance text should be concise and never wrap into clutter
+## Layout
 
-## Layout rules
+- Preserve the portrait layout: top HUD, board, bottom bar.
+- Keep the board as the visual center.
+- Keep top HUD text short and stable; avoid crowding the status bar.
+- Keep the bottom bar high enough for two wrapped text lines.
+- On narrow screens, reduce text length before reducing line readability.
 
-- Preserve a clear separation between HUD, board, and bottom guidance
-- Leave breathing room around the circular maze board
-- Avoid putting controls too close to the maze edge
-- Ensure touchable controls have visibly comfortable hit areas
-- Avoid crowding the bottom bar with too many simultaneous actions
+## Text
 
-## Buttons and panels
+Canvas text does not wrap automatically. Any variable or long Chinese copy must use a wrapping helper or a clipped safe region.
 
-- Use rounded rectangles for utility buttons and overlays
-- Match button emphasis to action importance
-- Keep destructive or risky actions visually distinct
-- Ensure overlays remain readable above the board without fully obscuring the game identity
+Check these text surfaces every time:
 
-## Maze readability rules
+- Start screen instructions.
+- Bottom message bar.
+- Fail/revive overlay copy.
+- Top HUD labels such as remaining count and timer.
 
-- Paths must remain visually independent
-- Do not create fake crossings or pseudo-intersections
-- Keep enough spacing between neighboring lines to preserve separation
-- Arrows must remain distinct from both line bodies and barriers
-- If a line is blocked, the barrier should read as a stop marker, not a direction marker
+Prefer short phrases:
 
-## Visual anti-patterns
+- "点线头，全部移出。"
+- "前方有线会被挡。"
+- "全部清空才过关。"
 
-- Do not draw barriers as X marks
-- Do not allow line joints to look like crossovers
-- Do not make arrow shafts disappear into the path body
-- Do not overuse glowing effects that blur path readability
-- Do not introduce webpage-like UI patterns that clash with the current Canvas game look
+## Board And Lines
+
+- Lines must feel independent and should not visually cross.
+- Keep enough spacing between neighboring bodies.
+- Avoid line endpoints touching another line unless it is intentional and readable.
+- Do not add standalone blockers; current blockers are other non-moving line bodies.
+- Moving lines should look like they are leaving along their own body, not sliding as a rigid block.
+
+## Arrow Head Rules
+
+- The arrow is part of the line head.
+- Do not draw a separate arrow icon on top of the line.
+- Direction must follow the final visible segment of the line head.
+- Arrow head should be short, solid, and readable at small sizes.
+- Avoid V-shaped floating heads that look disconnected from the line body.
+
+## Anti-Patterns
+
+- No X-shaped blockers.
+- No fake intersections.
+- No arrow heads that point away from the line's final segment.
+- No text that extends beyond the screen edge.
+- No decorative glow that blurs line readability.
+- No random visual elements that do not support player understanding, progression, or commercial polish.

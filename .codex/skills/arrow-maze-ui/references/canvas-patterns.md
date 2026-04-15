@@ -1,71 +1,81 @@
 # Canvas Patterns
 
-## Read order
+## Render Order
 
-Prefer this render order for game screens:
+Use this order for the playing screen:
 
-1. Background and atmosphere
-2. Board frame / board backdrop
-3. Maze lines
-4. Direction arrows
-5. Barriers / blockers
-6. Moving player marker
-7. HUD panels and controls
-8. Overlays and modal states
+1. Background gradient and atmosphere.
+2. Board frame and subtle grid.
+3. Static line bodies.
+4. Moving line bodies.
+5. Integrated line-head arrows.
+6. HUD panels and controls.
+7. Bottom hint/message bar.
+8. Modal overlays.
 
-## Common drawing patterns
+Keep board geometry below HUD and bottom UI. Do not let controls overlap line touch areas.
 
-### HUD
+## Wrapped Text
 
-- Draw HUD panels before text
-- Keep icon buttons visually aligned and consistently sized
-- Reserve the strongest contrast for the current level, health, and primary action
+Use a Canvas text wrapping helper for user-facing copy that can exceed the available width.
 
-### Maze lines
+Recommended behavior:
 
-- Use rounded line caps and joins
-- Keep line width stable within the same board
-- Prefer spacing fixes over thicker lines when readability drops
+- Measure with `ctx.measureText`.
+- Split Chinese text by character when needed.
+- Limit line count.
+- Keep line height explicit.
+- Prefer rewriting long copy when wrapping still feels crowded.
 
-### Direction arrows
+Do not rely on `fillText` to clip or wrap automatically.
 
-- Use a visible shaft plus head, not only a triangle
-- Keep arrow size proportional to line spacing
-- Ensure arrows do not blend into barrier marks
+## Line And Arrow Drawing
 
-### Barriers
+For each line:
 
-- Draw barriers perpendicular to the line direction when possible
-- Use a compact stop-mark silhouette
-- Keep the barrier legible without making it look like a collectible or arrow
+- Draw the body with stable `PATH_WIDTH`.
+- Use rounded caps and joins for the body.
+- Calculate the head from the current visible samples.
+- Build the arrow head from the head point and a point behind the head along the actual visible path.
+- Use the line's current state color for both body and head.
 
-### Overlays
+Avoid deriving arrow shape only from a configured exit direction if it can disagree with the final segment.
 
-- Dim the background enough to separate the modal
-- Preserve some board visibility so the player keeps context
-- Keep primary and secondary modal actions visually distinct
+## Snake-Style Movement
 
-## Touch targets
+Current movement uses a visible sample window along a travel path.
 
-- Touch detection should follow the visible geometry closely
-- If the visible line is thin, use a wider invisible touch radius
-- Avoid controls whose hit areas overlap the board unintentionally
+When editing UI around movement:
 
-## State handling
+- Preserve the "body exits along itself" illusion.
+- Treat moving lines as visually present but not blocking.
+- Ensure active color does not obscure neighboring static lines.
+- Keep the arrow head attached to the current moving head.
 
-For every UI element, define:
+## Hit Testing
 
-- Default state
-- Active or pressed state
-- Disabled or unavailable state
-- Success / error feedback if relevant
+Touch detection should remain more forgiving than the visible stroke.
 
-Avoid adding new UI without clarifying those states first.
+- Use a larger touch radius than line width.
+- Ignore escaped or moving lines for new taps.
+- Keep hit testing based on the line geometry the player sees.
 
-## WeChat Mini Game Canvas pitfalls
+## Validation Checklist
 
-- Re-check readability on small portrait screens
-- Avoid text-heavy panels
-- Avoid relying on browser DOM layout assumptions
-- Keep rendering logic explicit and deterministic
-- When changing icons or symbols, test that they still read correctly on lower-density screens
+After UI edits, run or reason through:
+
+- Syntax parse of `game.js` and `js/*.js`.
+- Arrow direction matches the final line segment.
+- First several levels have no segment intersections.
+- Start screen and bottom bar text stay inside screen width.
+- No draw method assumes `levelState` exists before a level loads.
+
+## Polish Checklist
+
+Before finalizing a UI pass, ask:
+
+- Does the screen look intentional enough for a store screenshot?
+- Does the player understand the next action within two seconds?
+- Are success and failure states visually distinct without being noisy?
+- Can a future ad/revive/share entry fit without breaking the layout?
+- Does the UI still read clearly on a small phone?

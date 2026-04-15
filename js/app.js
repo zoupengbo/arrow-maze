@@ -18,6 +18,17 @@ const windowInfo = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync(
 const pixelRatio = windowInfo.pixelRatio || 1;
 const screenWidth = windowInfo.windowWidth;
 const screenHeight = windowInfo.windowHeight;
+let menuButtonRect = null;
+try {
+  menuButtonRect = wx.getMenuButtonBoundingClientRect ? wx.getMenuButtonBoundingClientRect() : null;
+} catch (error) {
+  menuButtonRect = null;
+}
+const statusBarHeight = windowInfo.statusBarHeight || 0;
+const safeTop = Math.max(statusBarHeight, menuButtonRect ? menuButtonRect.bottom : statusBarHeight);
+const topHudY = Math.max(16, safeTop + 8);
+const topHudHeight = 76;
+const topHudBottom = topHudY + topHudHeight;
 const canvas = wx.createCanvas();
 canvas.width = screenWidth * pixelRatio;
 canvas.height = screenHeight * pixelRatio;
@@ -40,9 +51,149 @@ function roundedRect(x, y, width, height, radius) {
   ctx.closePath();
 }
 
+function drawWrappedText(text, x, y, maxWidth, lineHeight, maxLines) {
+  const chars = String(text).split("");
+  const lines = [];
+  let line = "";
+
+  for (let i = 0; i < chars.length; i += 1) {
+    const next = line + chars[i];
+    if (line && ctx.measureText(next).width > maxWidth) {
+      lines.push(line);
+      line = chars[i];
+      if (lines.length === maxLines) {
+        break;
+      }
+    } else {
+      line = next;
+    }
+  }
+
+  if (line && lines.length < maxLines) {
+    lines.push(line);
+  }
+
+  for (let i = 0; i < lines.length; i += 1) {
+    ctx.fillText(lines[i], x, y + i * lineHeight);
+  }
+}
+
+function drawSoftPanel(x, y, width, height, radius, fillStyle, shadowColor) {
+  ctx.save();
+  ctx.shadowColor = shadowColor || "rgba(0,0,0,0.2)";
+  ctx.shadowBlur = 18;
+  ctx.shadowOffsetY = 8;
+  roundedRect(x, y, width, height, radius);
+  ctx.fillStyle = fillStyle;
+  ctx.fill();
+  ctx.restore();
+
+  roundedRect(x, y, width, height, radius);
+  ctx.strokeStyle = "rgba(255,255,255,0.11)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+}
+
+function drawGradientButton(rect, text, fromColor, toColor, textStyle) {
+  const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+  gradient.addColorStop(0, fromColor);
+  gradient.addColorStop(1, toColor);
+  drawSoftPanel(rect.x, rect.y, rect.w, rect.h, 16, gradient, "rgba(0,0,0,0.24)");
+  ctx.fillStyle = textStyle || "#173345";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "bold 17px sans-serif";
+  ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h / 2);
+}
+
+function drawSmallBadge(x, y, width, text, fillStyle) {
+  roundedRect(x, y, width, 24, 12);
+  ctx.fillStyle = fillStyle || "rgba(255,255,255,0.09)";
+  ctx.fill();
+  ctx.fillStyle = COLORS.subText;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "11px sans-serif";
+  ctx.fillText(text, x + width / 2, y + 12);
+}
+
+function drawGlassPanel(x, y, width, height, radius, alpha) {
+  const gradient = ctx.createLinearGradient(x, y, x + width, y + height);
+  gradient.addColorStop(0, `rgba(32, 40, 78, ${alpha || 0.78})`);
+  gradient.addColorStop(0.56, `rgba(18, 24, 51, ${(alpha || 0.78) + 0.06})`);
+  gradient.addColorStop(1, `rgba(11, 15, 34, ${(alpha || 0.78) + 0.03})`);
+
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.22)";
+  ctx.shadowBlur = 16;
+  ctx.shadowOffsetY = 7;
+  roundedRect(x, y, width, height, radius);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  ctx.restore();
+
+  roundedRect(x, y, width, height, radius);
+  ctx.strokeStyle = "rgba(255,255,255,0.105)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.save();
+  roundedRect(x + 1, y + 1, width - 2, Math.max(18, height * 0.42), radius - 1);
+  ctx.clip();
+  const shine = ctx.createLinearGradient(x, y, x, y + height * 0.48);
+  shine.addColorStop(0, "rgba(255,255,255,0.07)");
+  shine.addColorStop(1, "rgba(255,255,255,0)");
+  ctx.fillStyle = shine;
+  ctx.fillRect(x, y, width, height * 0.48);
+  ctx.restore();
+}
+
+function drawIconButton(rect, text, active) {
+  const gradient = ctx.createLinearGradient(rect.x, rect.y, rect.x + rect.w, rect.y + rect.h);
+  gradient.addColorStop(0, active ? "rgba(126,231,255,0.2)" : "rgba(255,255,255,0.105)");
+  gradient.addColorStop(1, active ? "rgba(121,240,201,0.11)" : "rgba(255,255,255,0.055)");
+  roundedRect(rect.x, rect.y, rect.w, rect.h, 12);
+  ctx.fillStyle = gradient;
+  ctx.fill();
+  roundedRect(rect.x, rect.y, rect.w, rect.h, 12);
+  ctx.strokeStyle = active ? "rgba(126,231,255,0.22)" : "rgba(255,255,255,0.09)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.fillStyle = COLORS.text;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "bold 15px sans-serif";
+  ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h / 2);
+}
+
+function drawHudMetric(x, y, label, value) {
+  roundedRect(x, y, 50, 24, 12);
+  ctx.fillStyle = "rgba(255,255,255,0.065)";
+  ctx.fill();
+  roundedRect(x, y, 50, 24, 12);
+  ctx.strokeStyle = "rgba(255,255,255,0.07)";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = "10px sans-serif";
+  ctx.fillStyle = COLORS.subText;
+  ctx.fillText(label, x + 13, y + 12);
+  ctx.font = "bold 12px sans-serif";
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(value, x + 34, y + 12);
+}
+
 class ArrowMazeGame {
   constructor() {
-    this.layout = { width: screenWidth, height: screenHeight };
+    this.layout = {
+      width: screenWidth,
+      height: screenHeight,
+      safeTop,
+      topHudY,
+      topHudHeight,
+      topHudBottom
+    };
     this.sound = new SoundManager();
     this.state = "start";
     this.level = 1;
@@ -74,11 +225,11 @@ class ArrowMazeGame {
 
   createButtons() {
     return {
-      sound: { x: 66, y: 22, w: 46, h: 38 },
+      sound: { x: 66, y: topHudY + 7, w: 46, h: 36 },
       titleStart: { x: 54, y: screenHeight - 204, w: screenWidth - 108, h: 50 },
       titleContinue: { x: 54, y: screenHeight - 142, w: screenWidth - 108, h: 46 },
-      restart: { x: 14, y: 22, w: 44, h: 38 },
-      hint: { x: 18, y: screenHeight - 74, w: 84, h: 42 },
+      restart: { x: 14, y: topHudY + 7, w: 44, h: 36 },
+      hint: { x: 18, y: screenHeight - 88, w: 84, h: 42 },
       revive: { x: 48, y: screenHeight / 2 + 18, w: screenWidth - 96, h: 44 },
       retry: { x: 48, y: screenHeight / 2 + 74, w: screenWidth - 96, h: 44 }
     };
@@ -103,6 +254,43 @@ class ArrowMazeGame {
       wx.setStorageSync("arrow_maze_best_level", this.bestLevel);
     } catch (error) {
     }
+  }
+
+  vibrate(type) {
+    if (!wx.vibrateShort) {
+      return;
+    }
+    try {
+      wx.vibrateShort({
+        type: type || "light",
+        fail: () => {
+          try {
+            wx.vibrateShort();
+          } catch (fallbackError) {
+          }
+        }
+      });
+    } catch (error) {
+      try {
+        wx.vibrateShort();
+      } catch (fallbackError) {
+      }
+    }
+  }
+
+  getTimeLimit() {
+    return (this.levelState && this.levelState.config.timeLimitSeconds) || 240;
+  }
+
+  getRemainingTime() {
+    return Math.max(0, this.getTimeLimit() - this.elapsedTime);
+  }
+
+  formatTime(seconds) {
+    const total = Math.ceil(Math.max(0, seconds));
+    const minutes = Math.floor(total / 60);
+    const rest = total % 60;
+    return `${minutes}:${rest < 10 ? "0" : ""}${rest}`;
   }
 
   bindInput() {
@@ -139,14 +327,14 @@ class ArrowMazeGame {
   loadLevel() {
     this.levelState = createLevel(this.level, this.layout);
     this.hintCount = this.levelState.config.hintCount;
+    this.elapsedTime = 0;
     this.failedPathId = -1;
     this.hintPathId = -1;
     this.flashTimer = 0;
     this.levelClearTimer = 0;
     this.refreshMovablePaths();
-    this.message = this.levelState.mode === "handcrafted"
-      ? "点击箭头所在的线，把所有线一条条滑出屏幕。"
-      : "先移走外层线，给里面的线腾出出路。";
+    const minutes = Math.round(this.getTimeLimit() / 60);
+    this.message = `${this.levelState.config.name}关：${minutes} 分钟内把所有线滑出屏幕。`;
   }
 
   restartRun() {
@@ -392,6 +580,7 @@ class ArrowMazeGame {
       return;
     }
 
+    this.vibrate("light");
     path.moving = true;
     path.progress = 0;
     this.refreshMovablePaths();
@@ -400,6 +589,7 @@ class ArrowMazeGame {
   }
 
   failPath(path) {
+    this.vibrate("medium");
     this.hp -= 1;
     this.failedPathId = path.id;
     this.flashTimer = 0.72;
@@ -462,9 +652,22 @@ class ArrowMazeGame {
     setTimeout(revive, 600);
   }
 
+  handleTimeExpired() {
+    this.state = "gameover";
+    this.reviveUsed = true;
+    this.flashTimer = 0.6;
+    this.message = "时间用完了，本关需要在限定时间内通关。";
+    this.sound.play("crash");
+    this.vibrate("heavy");
+  }
+
   update(dt) {
     if (this.state === "playing" && this.levelState) {
       this.elapsedTime += dt;
+      if (this.levelClearTimer <= 0 && this.getRemainingCount() > 0 && this.elapsedTime >= this.getTimeLimit()) {
+        this.handleTimeExpired();
+        return;
+      }
     }
     this.flashTimer = Math.max(0, this.flashTimer - dt);
 
@@ -506,24 +709,43 @@ class ArrowMazeGame {
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, this.layout.width, this.layout.height);
 
-    ctx.fillStyle = "rgba(255,255,255,0.03)";
-    for (let i = 0; i < 5; i += 1) {
+    const heroGlow = ctx.createRadialGradient(
+      this.layout.width / 2,
+      270,
+      20,
+      this.layout.width / 2,
+      270,
+      260
+    );
+    heroGlow.addColorStop(0, "rgba(126,231,255,0.18)");
+    heroGlow.addColorStop(0.42, "rgba(126,231,255,0.06)");
+    heroGlow.addColorStop(1, "rgba(126,231,255,0)");
+    ctx.fillStyle = heroGlow;
+    ctx.fillRect(0, 0, this.layout.width, this.layout.height);
+
+    ctx.fillStyle = "rgba(255,255,255,0.032)";
+    for (let i = 0; i < 6; i += 1) {
       ctx.beginPath();
       ctx.arc(
-        this.layout.width * (0.18 + i * 0.18),
-        this.layout.height * (0.18 + (i % 2) * 0.15),
-        54 + i * 8,
+        this.layout.width * (0.08 + i * 0.18),
+        this.layout.height * (0.12 + (i % 3) * 0.11),
+        42 + i * 7,
         0,
         Math.PI * 2
       );
       ctx.fill();
     }
+
+    const vignette = ctx.createLinearGradient(0, 0, 0, this.layout.height);
+    vignette.addColorStop(0, "rgba(8,10,22,0)");
+    vignette.addColorStop(1, "rgba(8,10,22,0.32)");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, this.layout.width, this.layout.height);
   }
 
   drawTopBar() {
-    roundedRect(12, 16, this.layout.width - 24, 86, 22);
-    ctx.fillStyle = COLORS.panel;
-    ctx.fill();
+    const y = this.layout.topHudY;
+    drawSoftPanel(12, y, this.layout.width - 24, this.layout.topHudHeight, 22, COLORS.panelStrong, "rgba(0,0,0,0.26)");
 
     ctx.fillStyle = COLORS.panelAlt;
     roundedRect(this.buttons.restart.x, this.buttons.restart.y, this.buttons.restart.w, this.buttons.restart.h, 12);
@@ -541,34 +763,67 @@ class ArrowMazeGame {
 
     ctx.textBaseline = "top";
     ctx.font = "bold 22px sans-serif";
-    ctx.fillText(`关卡 ${this.level}`, this.layout.width / 2, 20);
+    ctx.fillText(`关卡 ${this.level}`, this.layout.width / 2, y + 8);
     ctx.font = "12px sans-serif";
     ctx.fillStyle = COLORS.subText;
-    ctx.fillText(this.levelState.config.name, this.layout.width / 2, 47);
+    ctx.fillText(this.levelState.config.name, this.layout.width / 2, y + 35);
 
     ctx.textAlign = "right";
     ctx.font = "12px sans-serif";
-    ctx.fillText(`剩余 ${this.getRemainingCount()} 条`, this.layout.width - 24, 24);
-    ctx.fillText(`计时 ${Math.floor(this.elapsedTime)}s`, this.layout.width - 24, 44);
+    ctx.fillText(`剩余 ${this.getRemainingCount()} 条`, this.layout.width - 24, y + 12);
+    ctx.fillText(`计时 ${Math.floor(this.elapsedTime)}s`, this.layout.width - 24, y + 32);
 
     ctx.textAlign = "center";
     ctx.font = "17px sans-serif";
     for (let i = 0; i < MAX_HP; i += 1) {
       ctx.fillStyle = i < this.hp ? "#ff6b7a" : "rgba(255,255,255,0.18)";
-      ctx.fillText("♥", this.layout.width / 2 - 22 + i * 22, 69);
+      ctx.fillText("♥", this.layout.width / 2 - 22 + i * 22, y + 56);
+    }
+  }
+
+  drawTopBarPolished() {
+    const y = this.layout.topHudY;
+    drawGlassPanel(12, y, this.layout.width - 24, this.layout.topHudHeight, 22, 0.72);
+
+    drawIconButton(this.buttons.restart, "↻", false);
+    drawIconButton(this.buttons.sound, this.sound.enabled ? "音" : "静", this.sound.enabled);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = COLORS.text;
+    ctx.font = "bold 22px sans-serif";
+    ctx.fillText(`关卡 ${this.level}`, this.layout.width / 2, y + 8);
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = COLORS.subText;
+    ctx.fillText(this.levelState.config.name, this.layout.width / 2, y + 34);
+
+    const metricX = this.layout.width - 116;
+    drawHudMetric(metricX, y + 12, "剩", `${this.getRemainingCount()}`);
+    drawHudMetric(metricX + 54, y + 12, "时", this.formatTime(this.getRemainingTime()));
+
+    ctx.textAlign = "center";
+    ctx.font = "18px sans-serif";
+    for (let i = 0; i < MAX_HP; i += 1) {
+      ctx.fillStyle = i < this.hp ? "#ff6b7a" : "rgba(255,255,255,0.18)";
+      ctx.fillText("♥", this.layout.width / 2 - 24 + i * 24, y + 56);
     }
   }
 
   drawBoardFrame() {
     const board = this.levelState.board;
-    roundedRect(board.x - 8, board.y - 8, board.width + 16, board.height + 16, 28);
+    ctx.save();
+    ctx.shadowColor = COLORS.glow;
+    ctx.shadowBlur = 28;
+    roundedRect(board.x - 10, board.y - 10, board.width + 20, board.height + 20, 30);
     ctx.fillStyle = COLORS.boardRing;
     ctx.fill();
+    ctx.restore();
 
     roundedRect(board.x, board.y, board.width, board.height, 24);
     const panelGradient = ctx.createLinearGradient(board.x, board.y, board.x + board.width, board.y + board.height);
-    panelGradient.addColorStop(0, "rgba(255,255,255,0.05)");
-    panelGradient.addColorStop(1, "rgba(255,255,255,0.015)");
+    panelGradient.addColorStop(0, "rgba(255,255,255,0.075)");
+    panelGradient.addColorStop(0.52, "rgba(255,255,255,0.026)");
+    panelGradient.addColorStop(1, "rgba(0,0,0,0.035)");
     ctx.fillStyle = panelGradient;
     ctx.fill();
 
@@ -596,6 +851,8 @@ class ArrowMazeGame {
     ctx.lineWidth = 2;
     roundedRect(board.x, board.y, board.width, board.height, 24);
     ctx.stroke();
+
+    drawSmallBadge(board.x + 14, board.y + 14, 74, "全部清空", "rgba(21,25,51,0.68)");
   }
 
   drawPath(path) {
@@ -619,20 +876,18 @@ class ArrowMazeGame {
           ? COLORS.success
           : COLORS.line;
 
-    const head = visibleSamples[visibleSamples.length - 1];
     const normal = { x: -path.dir.y, y: path.dir.x };
-    const headLength = Math.max(PATH_WIDTH * 2.3, 11);
-    const headWidth = Math.max(PATH_WIDTH * 1.05, 5);
-    const bodyEnd = {
-      x: head.x - path.dir.x * headLength,
-      y: head.y - path.dir.y * headLength
-    };
+    const headLength = Math.max(PATH_WIDTH * 2.8, 14);
+    const headWidth = Math.max(PATH_WIDTH * 1.25, 6);
+    const head = visibleSamples[visibleSamples.length - 1];
+    const bodyEnd = this.getHeadBasePoint(visibleSamples, path.dir, headLength);
 
-    ctx.strokeStyle = stroke;
-    ctx.fillStyle = stroke;
     ctx.lineWidth = PATH_WIDTH;
-    ctx.lineCap = "round";
+    ctx.lineCap = "butt";
     ctx.lineJoin = "round";
+
+    ctx.strokeStyle = isRunning ? "rgba(115,240,200,0.24)" : "rgba(0,0,0,0.24)";
+    ctx.lineWidth = PATH_WIDTH + 5;
     ctx.beginPath();
     ctx.moveTo(visibleSamples[0].x, visibleSamples[0].y);
     for (let i = 1; i < visibleSamples.length - 1; i += 1) {
@@ -642,6 +897,42 @@ class ArrowMazeGame {
       ctx.lineTo(bodyEnd.x, bodyEnd.y);
     }
     ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(visibleSamples[0].x, visibleSamples[0].y, (PATH_WIDTH + 5) / 2, 0, Math.PI * 2);
+    ctx.fillStyle = isRunning ? "rgba(115,240,200,0.24)" : "rgba(0,0,0,0.24)";
+    ctx.fill();
+
+    ctx.strokeStyle = stroke;
+    ctx.fillStyle = stroke;
+    ctx.lineWidth = PATH_WIDTH;
+    ctx.beginPath();
+    ctx.moveTo(visibleSamples[0].x, visibleSamples[0].y);
+    for (let i = 1; i < visibleSamples.length - 1; i += 1) {
+      ctx.lineTo(visibleSamples[i].x, visibleSamples[i].y);
+    }
+    if (visibleSamples.length > 1) {
+      ctx.lineTo(bodyEnd.x, bodyEnd.y);
+    }
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(visibleSamples[0].x, visibleSamples[0].y, PATH_WIDTH / 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.save();
+    ctx.fillStyle = isRunning ? "rgba(115,240,200,0.28)" : "rgba(0,0,0,0.2)";
+    ctx.beginPath();
+    ctx.moveTo(head.x, head.y);
+    ctx.lineTo(
+      bodyEnd.x + normal.x * (headWidth + 2),
+      bodyEnd.y + normal.y * (headWidth + 2)
+    );
+    ctx.lineTo(
+      bodyEnd.x - normal.x * (headWidth + 2),
+      bodyEnd.y - normal.y * (headWidth + 2)
+    );
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
     ctx.beginPath();
     ctx.moveTo(head.x, head.y);
@@ -657,6 +948,63 @@ class ArrowMazeGame {
     ctx.fill();
   }
 
+  getPointBehindHead(samples, distance) {
+    let remaining = distance;
+    let head = samples[samples.length - 1];
+
+    for (let i = samples.length - 2; i >= 0; i -= 1) {
+      const point = samples[i];
+      const dx = head.x - point.x;
+      const dy = head.y - point.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+
+      if (length >= remaining && length > 0) {
+        const t = remaining / length;
+        return {
+          x: head.x - dx * t,
+          y: head.y - dy * t
+        };
+      }
+
+      remaining -= length;
+      head = point;
+    }
+
+    return samples[0];
+  }
+
+  getHeadBasePoint(samples, dir, distance) {
+    const head = samples[samples.length - 1];
+    let available = 0;
+    let cursor = head;
+
+    for (let i = samples.length - 2; i >= 0; i -= 1) {
+      const point = samples[i];
+      const dx = cursor.x - point.x;
+      const dy = cursor.y - point.y;
+      const along = dx * dir.x + dy * dir.y;
+      const cross = Math.abs(dx * dir.y - dy * dir.x);
+      const length = Math.sqrt(dx * dx + dy * dy);
+      if (along <= 0 || cross > 0.5 || length <= 0) {
+        break;
+      }
+      available += length;
+      if (available >= distance) {
+        return {
+          x: head.x - dir.x * distance,
+          y: head.y - dir.y * distance
+        };
+      }
+      cursor = point;
+    }
+
+    const safeDistance = Math.max(PATH_WIDTH * 1.8, Math.min(distance, available || distance));
+    return {
+      x: head.x - dir.x * safeDistance,
+      y: head.y - dir.y * safeDistance
+    };
+  }
+
   drawBoard() {
     this.drawBoardFrame();
     for (let i = 0; i < this.levelState.paths.length; i += 1) {
@@ -665,13 +1013,14 @@ class ArrowMazeGame {
   }
 
   drawBottomBar() {
-    const y = this.layout.height - 96;
-    roundedRect(12, y, this.layout.width - 24, 70, 22);
-    ctx.fillStyle = COLORS.panel;
-    ctx.fill();
+    const y = this.layout.height - 106;
+    drawSoftPanel(12, y, this.layout.width - 24, 82, 22, COLORS.panelStrong, "rgba(0,0,0,0.28)");
 
-    roundedRect(this.buttons.hint.x, this.buttons.hint.y, this.buttons.hint.w, this.buttons.hint.h, 12);
-    ctx.fillStyle = this.hintCount > 0 ? COLORS.panelAlt : COLORS.panelSoft;
+    const hintGradient = ctx.createLinearGradient(this.buttons.hint.x, this.buttons.hint.y, this.buttons.hint.x + this.buttons.hint.w, this.buttons.hint.y + this.buttons.hint.h);
+    hintGradient.addColorStop(0, this.hintCount > 0 ? "#7280bd" : "rgba(255,255,255,0.08)");
+    hintGradient.addColorStop(1, this.hintCount > 0 ? "#586398" : "rgba(255,255,255,0.04)");
+    roundedRect(this.buttons.hint.x, this.buttons.hint.y, this.buttons.hint.w, this.buttons.hint.h, 13);
+    ctx.fillStyle = hintGradient;
     ctx.fill();
 
     ctx.fillStyle = COLORS.text;
@@ -682,29 +1031,114 @@ class ArrowMazeGame {
 
     ctx.textAlign = "left";
     ctx.textBaseline = "top";
-    ctx.font = "16px sans-serif";
+    ctx.font = "15px sans-serif";
     ctx.fillStyle = COLORS.text;
-    ctx.fillText(this.message, 118, y + 12);
+    drawWrappedText(this.message, 118, y + 12, this.layout.width - 136, 18, 2);
     ctx.font = "12px sans-serif";
     ctx.fillStyle = COLORS.subText;
-    ctx.fillText("通关条件：把当前关卡里的所有线都移出屏幕。", 118, y + 40);
+    drawWrappedText("通关条件：把当前关卡里的所有线都移出屏幕。", 118, y + 51, this.layout.width - 136, 14, 1);
+  }
+
+  drawBottomBarPolished() {
+    const y = this.layout.height - 108;
+    drawGlassPanel(12, y, this.layout.width - 24, 82, 24, 0.68);
+
+    const accent = ctx.createLinearGradient(24, y + 18, 24, y + 70);
+    accent.addColorStop(0, COLORS.accent);
+    accent.addColorStop(1, COLORS.success);
+    roundedRect(24, y + 18, 3, 46, 2);
+    ctx.fillStyle = accent;
+    ctx.fill();
+
+    const hintY = y + 23;
+    const hintGradient = ctx.createLinearGradient(this.buttons.hint.x, hintY, this.buttons.hint.x + this.buttons.hint.w, hintY + 38);
+    hintGradient.addColorStop(0, this.hintCount > 0 ? "rgba(143,161,238,0.82)" : "rgba(255,255,255,0.065)");
+    hintGradient.addColorStop(1, this.hintCount > 0 ? "rgba(101,114,179,0.74)" : "rgba(255,255,255,0.035)");
+    roundedRect(this.buttons.hint.x, hintY, this.buttons.hint.w, 38, 14);
+    ctx.fillStyle = hintGradient;
+    ctx.fill();
+    roundedRect(this.buttons.hint.x, hintY, this.buttons.hint.w, 38, 14);
+    ctx.strokeStyle = this.hintCount > 0 ? "rgba(160,178,255,0.24)" : "rgba(255,255,255,0.07)";
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    ctx.fillStyle = this.hintCount > 0 ? COLORS.text : COLORS.subText;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 15px sans-serif";
+    ctx.fillText(`提示 ${this.hintCount}`, this.buttons.hint.x + this.buttons.hint.w / 2, hintY + 19);
+
+    const textX = this.buttons.hint.x + this.buttons.hint.w + 18;
+    const textWidth = this.layout.width - textX - 28;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.font = "bold 14px sans-serif";
+    ctx.fillStyle = COLORS.text;
+    drawWrappedText(this.message, textX, y + 14, textWidth, 17, 2);
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = COLORS.subText;
+    drawWrappedText("目标：所有线都滑出屏幕。", textX, y + 54, textWidth, 14, 1);
   }
 
   drawGameScreen() {
-    this.drawTopBar();
+    this.drawTopBarPolished();
     this.drawBoard();
-    this.drawBottomBar();
+    this.drawBottomBarPolished();
   }
 
   drawButton(rect, text, fillStyle, textStyle) {
-    roundedRect(rect.x, rect.y, rect.w, rect.h, 16);
-    ctx.fillStyle = fillStyle;
-    ctx.fill();
+    drawSoftPanel(rect.x, rect.y, rect.w, rect.h, 16, fillStyle, "rgba(0,0,0,0.24)");
     ctx.fillStyle = textStyle || COLORS.text;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     ctx.font = "bold 17px sans-serif";
     ctx.fillText(text, rect.x + rect.w / 2, rect.y + rect.h / 2);
+  }
+
+  drawStartPreview(x, y, width, height) {
+    drawSoftPanel(x, y, width, height, 18, "rgba(255,255,255,0.055)", "rgba(0,0,0,0.18)");
+    ctx.save();
+    roundedRect(x, y, width, height, 18);
+    ctx.clip();
+
+    ctx.strokeStyle = "rgba(255,255,255,0.055)";
+    ctx.lineWidth = 1;
+    for (let gx = x + 18; gx < x + width; gx += 22) {
+      ctx.beginPath();
+      ctx.moveTo(gx, y + 12);
+      ctx.lineTo(gx, y + height - 12);
+      ctx.stroke();
+    }
+    for (let gy = y + 18; gy < y + height; gy += 22) {
+      ctx.beginPath();
+      ctx.moveTo(x + 12, gy);
+      ctx.lineTo(x + width - 12, gy);
+      ctx.stroke();
+    }
+
+    ctx.strokeStyle = COLORS.line;
+    ctx.fillStyle = COLORS.line;
+    ctx.lineWidth = PATH_WIDTH;
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    const samples = [
+      [{ x: x + 32, y: y + 34 }, { x: x + 78, y: y + 34 }, { x: x + 78, y: y + 72 }],
+      [{ x: x + width - 34, y: y + 38 }, { x: x + width - 86, y: y + 38 }, { x: x + width - 86, y: y + 82 }],
+      [{ x: x + 52, y: y + height - 34 }, { x: x + 112, y: y + height - 34 }]
+    ];
+
+    for (let i = 0; i < samples.length; i += 1) {
+      const line = samples[i];
+      ctx.beginPath();
+      ctx.moveTo(line[0].x, line[0].y);
+      for (let j = 1; j < line.length; j += 1) {
+        ctx.lineTo(line[j].x, line[j].y);
+      }
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   drawStartScreen() {
@@ -723,19 +1157,49 @@ class ArrowMazeGame {
 
     ctx.font = "16px sans-serif";
     ctx.fillStyle = COLORS.subText;
-    ctx.fillText("点击箭头所在的线，整条线会按箭头方向整体滑出。", this.layout.width / 2, 188);
-    ctx.fillText("前方被别的线身挡住会掉血，所有线都移出屏幕才过关。", this.layout.width / 2, 214);
-    ctx.fillText(`前 ${HANDCRAFTED_LEVELS.length} 关为手工关卡，后续继续自动生成。`, this.layout.width / 2, 240);
-
-    roundedRect(62, 282, this.layout.width - 124, 94, 20);
+    drawWrappedText("点击箭头所在的线，整条线会按箭头方向整体滑出。", this.layout.width / 2, 188, this.layout.width - 92, 22, 2);
+    drawWrappedText("前方被别的线身挡住会掉血，所有线都移出屏幕才过关。", this.layout.width / 2, 236, this.layout.width - 92, 22, 2);
+    drawWrappedText(`前 ${HANDCRAFTED_LEVELS.length} 关为手工关卡，后续继续自动生成。`, this.layout.width / 2, 284, this.layout.width - 92, 20, 1);
+    roundedRect(62, 326, this.layout.width - 124, 74, 20);
     ctx.fillStyle = "rgba(255,255,255,0.05)";
     ctx.fill();
     ctx.font = "14px sans-serif";
     ctx.fillStyle = COLORS.subText;
-    ctx.fillText(`最高记录：第 ${Math.max(1, this.bestLevel - 1)} 关`, this.layout.width / 2, 306);
-    ctx.fillText("支持提示、音效和分享复活。", this.layout.width / 2, 332);
+    drawWrappedText(`最高记录：第 ${Math.max(1, this.bestLevel - 1)} 关`, this.layout.width / 2, 345, this.layout.width - 150, 20, 1);
+    drawWrappedText("支持提示、音效和分享复活。", this.layout.width / 2, 370, this.layout.width - 150, 18, 1);
 
     this.drawButton(this.buttons.titleStart, "开始挑战", COLORS.accent, "#183346");
+    if (this.bestLevel > 1) {
+      this.drawButton(this.buttons.titleContinue, `从第 ${this.bestLevel} 关继续`, COLORS.panelAlt, COLORS.text);
+    }
+  }
+
+  drawStartPolishOverlay() {
+    drawSoftPanel(30, 88, this.layout.width - 60, 390, 30, COLORS.panelStrong, "rgba(0,0,0,0.32)");
+    drawSmallBadge(this.layout.width / 2 - 44, 112, 88, "休闲解谜", "rgba(120,231,255,0.12)");
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = COLORS.text;
+    ctx.font = "bold 34px sans-serif";
+    ctx.fillText("箭头迷阵", this.layout.width / 2, 142);
+
+    ctx.font = "16px sans-serif";
+    ctx.fillStyle = COLORS.subText;
+    drawWrappedText("点击线头，让每条线沿自己的轨迹滑出。", this.layout.width / 2, 190, this.layout.width - 92, 22, 2);
+    drawWrappedText("前方有线会被挡住，全部清空才算过关。", this.layout.width / 2, 236, this.layout.width - 92, 22, 2);
+
+    this.drawStartPreview(62, 286, this.layout.width - 124, 92);
+
+    roundedRect(62, 396, this.layout.width - 124, 54, 18);
+    ctx.fillStyle = "rgba(255,255,255,0.055)";
+    ctx.fill();
+    ctx.font = "14px sans-serif";
+    ctx.fillStyle = COLORS.subText;
+    drawWrappedText(`最高记录：第 ${Math.max(1, this.bestLevel - 1)} 关`, this.layout.width / 2, 407, this.layout.width - 150, 18, 1);
+    drawWrappedText(`前 ${HANDCRAFTED_LEVELS.length} 关手工设计，后续自动生成`, this.layout.width / 2, 428, this.layout.width - 150, 18, 1);
+
+    drawGradientButton(this.buttons.titleStart, "开始挑战", "#7ee7ff", "#79f0c9", "#173346");
     if (this.bestLevel > 1) {
       this.drawButton(this.buttons.titleContinue, `从第 ${this.bestLevel} 关继续`, COLORS.panelAlt, COLORS.text);
     }
@@ -773,16 +1237,50 @@ class ArrowMazeGame {
     this.drawButton(this.buttons.retry, "重新开始", COLORS.panelAlt, COLORS.text);
   }
 
+  drawGameOverPolishOverlay() {
+    ctx.fillStyle = COLORS.overlay;
+    ctx.fillRect(0, 0, this.layout.width, this.layout.height);
+
+    const panelY = this.layout.height / 2 - 142;
+    drawSoftPanel(34, panelY, this.layout.width - 68, 252, 28, COLORS.panelStrong, "rgba(0,0,0,0.36)");
+    drawSmallBadge(this.layout.width / 2 - 42, panelY + 20, 84, "本局结束", "rgba(255,118,124,0.13)");
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = COLORS.text;
+    ctx.font = "bold 27px sans-serif";
+    ctx.fillText("挑战失败", this.layout.width / 2, panelY + 56);
+
+    ctx.font = "15px sans-serif";
+    ctx.fillStyle = COLORS.subText;
+    drawWrappedText(`本次止步第 ${this.level} 关，还有 ${this.getRemainingCount()} 条线没有移出。`, this.layout.width / 2, panelY + 98, this.layout.width - 116, 21, 2);
+    drawWrappedText("复活后保留当前局面，继续把剩余线条清空。", this.layout.width / 2, panelY + 142, this.layout.width - 116, 19, 2);
+
+    if (!this.reviveUsed) {
+      drawGradientButton(this.buttons.revive, "分享复活", "#8df3c7", "#78e7ff", "#173346");
+    } else {
+      roundedRect(this.buttons.revive.x, this.buttons.revive.y, this.buttons.revive.w, this.buttons.revive.h, 16);
+      ctx.fillStyle = COLORS.panelSoft;
+      ctx.fill();
+      ctx.fillStyle = COLORS.subText;
+      ctx.textBaseline = "middle";
+      ctx.fillText("本局已使用复活", this.layout.width / 2, this.buttons.revive.y + this.buttons.revive.h / 2);
+    }
+
+    this.drawButton(this.buttons.retry, "重新开始", COLORS.panelAlt, COLORS.text);
+  }
+
   render() {
     this.drawBackground();
     if (this.state === "start" || !this.levelState) {
-      this.drawStartScreen();
+      this.drawStartPolishOverlay();
       return;
     }
 
     this.drawGameScreen();
     if (this.state === "gameover") {
       this.drawGameOver();
+      this.drawGameOverPolishOverlay();
     }
   }
 

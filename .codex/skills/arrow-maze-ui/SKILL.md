@@ -1,84 +1,82 @@
 ---
 name: arrow-maze-ui
-description: Project-specific UI design and implementation guidance for the current Arrow Maze WeChat Mini Game. Use when Codex needs to design, refine, or implement UI for this project, including the start screen, top HUD, circular maze board, bottom hint bar, failure/revive overlays, button styling, Canvas layout fixes, visual consistency, and WeChat Mini Game Canvas UI issues. Do not use for pure gameplay logic, procedural maze generation, unrelated web UI, or non-WeChat-native app interfaces.
+description: 箭头迷阵 UI：用于把当前微信小游戏打磨成成熟商业化 Canvas 休闲解谜项目。覆盖布局、视觉风格、开始页、顶部 HUD、棋盘、蛇形箭头线、底部提示、失败/复活弹层、文字溢出、小屏适配、无交点视觉检查和微信小游戏 Canvas 绘制问题。不用于无关网页 UI、纯后端或完全不涉及视觉的玩法算法。
 ---
 
-# Arrow Maze UI
+# 箭头迷阵 UI
 
-Read the current UI implementation before making changes. Start with `js/app.js`, then read `js/config.js`, and read `js/levels.js` when the request touches maze readability or line layout.
+Use this skill for UI work in `D:\personWork\arrow-maze`.
 
-Treat this skill as project-specific. Preserve the existing visual language and improve it iteratively instead of replacing it with a generic mobile game skin.
+Read the current implementation before making changes:
 
-## Core workflow
+1. `js/app.js` for Canvas drawing, screens, text, buttons, and state UI.
+2. `js/config.js` for color, line width, and layout constants.
+3. `js/levels.js` when line placement, arrow direction, or no-intersection readability is involved.
 
-1. Inspect the current Canvas drawing flow and identify which screen or state the user is talking about.
-2. Keep all new UI compatible with the existing WeChat Mini Game Canvas approach unless the user explicitly asks to refactor the rendering architecture.
-3. Define every UI change in four dimensions before implementing:
-   - Visual style
-   - State changes
-   - Touch target
-   - Draw order / layering
-4. Prefer improving clarity and consistency over adding decorative detail.
-5. After changes, verify that the UI still reads well on a small portrait screen.
+Preserve the current WeChat Mini Game Canvas architecture. Improve the existing style instead of replacing it with generic mobile UI.
 
-## Project visual direction
+Act like a senior WeChat Mini Game UI designer and production polish partner. Give practical layout, style, hierarchy, feedback, and commercial-quality optimization suggestions before or while implementing UI changes. Favor decisions that make the game feel mature, readable, and ready for real players.
 
-Keep the current direction unless the user explicitly asks for a re-theme:
+## Current Game UI Model
 
-- Cool-toned background with soft atmospheric depth
-- Light maze lines and panels over a darker field
-- Accent colors only for success, warning, danger, and focus
-- Rounded panels and a circular main board
-- Minimal iconography with clear silhouette-first readability
+The game uses a portrait WeChat Canvas layout:
 
-Read [references/ui-rules.md](references/ui-rules.md) for detailed style rules.
+- Top HUD with level, HP, timer, remaining line count, restart, and sound controls.
+- Rectangular play board with subtle grid/backdrop.
+- Multiple bent line bodies that each have an integrated arrow-like head.
+- Lines move out snake-style along their own path.
+- Bottom hint/message bar with a hint button and wrapped guidance text.
+- Start screen and failure/revive overlay drawn directly on Canvas.
 
-## UI areas to prioritize
+There are no standalone blockers in the current rules. Other non-moving line bodies are the blockers.
 
-Handle requests with this priority order when multiple surfaces are involved:
+## Core Workflow
 
-1. Start screen
-2. Top HUD
-3. Circular maze board
-4. Bottom hint / message bar
-5. Failure and revive overlays
+For any UI change:
 
-## Default review checklist
+1. Identify the exact screen/state: start, playing, moving, blocked, gameover, revive, or hint.
+2. Inspect the relevant draw method before editing.
+3. Keep visual geometry and touch geometry aligned.
+4. Define draw order, state feedback, and text behavior.
+5. Verify small-screen portrait readability after changing layout.
 
-When the user asks to "optimize UI" or gives a vague UI request, review and improve these first:
+For board-related changes, also verify:
 
-- Readability
-- Direction expression
-- State feedback
-- Density / crowding
+- Arrow heads are part of the line, not separate floating icons.
+- Arrow direction follows the line head's final segment.
+- Line bodies do not overlap or create false crossing illusions.
+- Moving lines remain visually readable during snake-style exit animation.
+- Bottom and top UI do not cover the board.
 
-## Maze-specific visual checks
+## Default Fix Priorities
 
-Always check these before finalizing any board-related UI change:
+When the user says "UI has issues", "looks wrong", or sends a screenshot, check in this order:
 
-- Arrows clearly express movement direction
-- Barriers cannot be mistaken for arrows
-- Lines do not create fake intersections
-- Touch targets align with the visible lines
-- Small-screen spacing remains readable
+1. Arrow head direction and shape.
+2. Line intersections, overlaps, or false intersections.
+3. Text overflow on start screen, HUD, bottom bar, and overlays.
+4. Density and spacing inside the board.
+5. Touch target alignment with visible lines.
 
-If the user says "make it closer to the screenshot", interpret that as:
+## Commercial Polish Lens
 
-- Cleaner linework
-- Clearer direction arrows
-- No false crossing illusion
-- More balanced spacing and composition
+When improving UI, consider:
 
-## Boundaries
+- First impression: title screen, main CTA, and visual identity should feel intentional.
+- Player clarity: the player should instantly understand which line head to tap and why a move failed.
+- Feedback quality: success, blocked, hint, revive, and level-clear states should feel responsive.
+- Retention: HUD, level naming, progress, and best-record display should encourage another try.
+- Monetization readiness: revive/share/ad-like entry points should be visually clear but not aggressive.
 
-Do not use this skill for:
+## Implementation Rules
 
-- Pure gameplay rules or combat logic
-- Pure algorithm or generation work with no UI impact
-- Generic DOM/React website styling
-- Native app UI outside WeChat Mini Game Canvas
+- Prefer helper functions in `js/app.js` for reusable Canvas patterns such as wrapped text.
+- Keep the arrow head integrated into the same path style as the line body.
+- Do not reintroduce separate arrow sprites, floating arrow icons, or barrier marks unless the user explicitly changes the rules.
+- Avoid DOM, CSS, React, or webpage layout assumptions; this is Canvas-only.
+- Keep all UI strings inside safe widths; Canvas does not wrap text automatically.
 
 ## References
 
-- Use [references/ui-rules.md](references/ui-rules.md) for style and layout rules.
-- Use [references/canvas-patterns.md](references/canvas-patterns.md) for Canvas implementation patterns and pitfalls.
+- Read `references/ui-rules.md` for visual and layout rules.
+- Read `references/canvas-patterns.md` for Canvas implementation patterns and common pitfalls.

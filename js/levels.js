@@ -22,7 +22,7 @@ const HANDCRAFTED_LEVELS = [
       { cells: [[15, 3], [15, 7], [18, 7]], exit: "right" },
       { cells: [[5, 12], [5, 16], [9, 16], [9, 19]], exit: "bottom" },
       { cells: [[11, 12], [11, 16], [15, 16], [15, 19]], exit: "bottom" },
-      { cells: [[3, 9], [6, 9], [6, 5]], exit: "top" },
+      { cells: [[5, 8], [7, 8], [7, 5]], exit: "top" },
       { cells: [[14, 14], [18, 14]], exit: "right" }
     ]
   },
@@ -37,9 +37,9 @@ const HANDCRAFTED_LEVELS = [
       { cells: [[4, 13], [8, 13], [8, 17], [5, 17]], exit: "left" },
       { cells: [[10, 12], [10, 17], [13, 17], [13, 19]], exit: "bottom" },
       { cells: [[15, 11], [15, 15], [18, 15]], exit: "right" },
-      { cells: [[6, 4], [6, 8], [3, 8]], exit: "left" },
-      { cells: [[12, 11], [12, 15], [9, 15]], exit: "left" },
-      { cells: [[16, 14], [16, 18]], exit: "bottom" }
+      { cells: [[5, 3], [5, 5], [2, 5]], exit: "left" },
+      { cells: [[14, 11], [14, 14], [12, 14]], exit: "left" },
+      { cells: [[16, 16], [16, 18]], exit: "bottom" }
     ]
   },
   {
@@ -49,16 +49,20 @@ const HANDCRAFTED_LEVELS = [
     paths: [
       { cells: [[4, 4], [4, 9], [7, 9], [7, 13]], exit: "bottom" },
       { cells: [[8, 4], [8, 8], [11, 8], [11, 4]], exit: "top" },
-      { cells: [[14, 4], [14, 9], [18, 9]], exit: "right" },
+      { cells: [[14, 4], [14, 8], [18, 8]], exit: "right" },
       { cells: [[3, 12], [6, 12], [6, 17], [3, 17]], exit: "left" },
       { cells: [[9, 11], [9, 15], [13, 15], [13, 19]], exit: "bottom" },
       { cells: [[15, 12], [18, 12], [18, 16]], exit: "right" },
-      { cells: [[11, 10], [15, 10], [15, 6]], exit: "top" },
-      { cells: [[5, 16], [8, 16], [8, 18]], exit: "bottom" },
-      { cells: [[12, 13], [12, 17], [16, 17]], exit: "right" }
+      { cells: [[11, 10], [13, 10], [13, 5]], exit: "top" },
+      { cells: [[7, 16], [9, 16], [9, 18]], exit: "bottom" },
+      { cells: [[14, 13], [14, 17], [16, 17]], exit: "right" }
     ]
   }
 ];
+
+function getLevelConfig(levelIndex) {
+  return LEVEL_CONFIGS[(levelIndex - 1) % LEVEL_CONFIGS.length];
+}
 
 function cellKey(x, y) {
   return `${x},${y}`;
@@ -91,11 +95,13 @@ function reserveCells(occupied, cells, cols, rows) {
 }
 
 function boardForLayout(layout) {
+  const y = Math.max(126, (layout.topHudBottom || 102) + 24);
+  const bottomReserve = 164;
   return {
     x: 28,
-    y: 126,
+    y,
     width: layout.width - 56,
-    height: 400
+    height: Math.min(400, Math.max(320, layout.height - y - bottomReserve))
   };
 }
 
@@ -106,8 +112,29 @@ function toPoint(board, cell) {
   };
 }
 
+function getHeadDirection(points, exit) {
+  const fallback = MOVE_DIRS[exit];
+  if (points.length < 2) {
+    return { x: fallback.x, y: fallback.y };
+  }
+
+  const head = points[points.length - 1];
+  const prev = points[points.length - 2];
+  const dx = head.x - prev.x;
+  const dy = head.y - prev.y;
+
+  if (Math.abs(dx) >= Math.abs(dy) && dx !== 0) {
+    return { x: Math.sign(dx), y: 0 };
+  }
+  if (dy !== 0) {
+    return { x: 0, y: Math.sign(dy) };
+  }
+
+  return { x: fallback.x, y: fallback.y };
+}
+
 function createPath(id, points, exit) {
-  const dir = MOVE_DIRS[exit];
+  const dir = getHeadDirection(points, exit);
   const meta = buildPathMeta(points);
   return {
     id,
@@ -134,6 +161,7 @@ function createHandcraftedLevel(levelIndex, layout) {
     return null;
   }
 
+  const cycleConfig = getLevelConfig(levelIndex);
   const board = boardForLayout(layout);
   const paths = level.paths.map((pathData, index) => {
     const points = pathData.cells.map((cell) => toPoint(board, cell));
@@ -142,9 +170,10 @@ function createHandcraftedLevel(levelIndex, layout) {
 
   return {
     config: {
-      name: level.name,
-      hintCount: level.hintCount,
-      moveSpeed: level.moveSpeed
+      name: cycleConfig.name,
+      hintCount: cycleConfig.hintCount,
+      moveSpeed: cycleConfig.moveSpeed,
+      timeLimitSeconds: cycleConfig.timeLimitSeconds
     },
     board,
     paths,
@@ -248,7 +277,7 @@ function buildDensePath(rng, board, config) {
 }
 
 function createProceduralLevel(levelIndex, layout) {
-  const baseConfig = LEVEL_CONFIGS[(levelIndex - 1) % LEVEL_CONFIGS.length];
+  const baseConfig = getLevelConfig(levelIndex);
   const config = {
     name: baseConfig.name,
     pathCount: baseConfig.pathCount,
@@ -256,6 +285,7 @@ function createProceduralLevel(levelIndex, layout) {
     turnsMax: baseConfig.turnsMax,
     hintCount: baseConfig.hintCount,
     moveSpeed: Math.max(220, baseConfig.moveSpeed + 78),
+    timeLimitSeconds: baseConfig.timeLimitSeconds,
     occupied: new Set()
   };
   const rng = new RNG(7001 + levelIndex * 131);
@@ -265,8 +295,19 @@ function createProceduralLevel(levelIndex, layout) {
   const rows = Math.floor(board.height / GRID_SIZE);
 
   for (let i = 0; i < config.pathCount; i += 1) {
-    const pathData = buildDensePath(rng, board, config);
-    paths.push(createPath(i, pathData.points, pathData.exit));
+    let pathData = null;
+    for (let attempt = 0; attempt < 12; attempt += 1) {
+      const candidate = buildDensePath(rng, board, config);
+      if (candidate.points.length >= 2) {
+        pathData = candidate;
+        break;
+      }
+    }
+    if (!pathData) {
+      continue;
+    }
+
+    paths.push(createPath(paths.length, pathData.points, pathData.exit));
 
     for (let j = 0; j < pathData.points.length - 1; j += 1) {
       const from = [
@@ -286,7 +327,8 @@ function createProceduralLevel(levelIndex, layout) {
     config: {
       name: config.name,
       hintCount: config.hintCount,
-      moveSpeed: config.moveSpeed
+      moveSpeed: config.moveSpeed,
+      timeLimitSeconds: config.timeLimitSeconds
     },
     board,
     paths,

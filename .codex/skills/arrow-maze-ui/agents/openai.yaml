@@ -1,4 +1,4 @@
 version: 1
-display_name: Arrow Maze UI
-short_description: Project-specific UI design and implementation guidance for the Arrow Maze WeChat Mini Game
-default_prompt: Provide UI design, implementation, and refinement guidance for the current WeChat Mini Game while preserving the existing Canvas visual style.
+display_name: 箭头迷阵 UI
+short_description: 当前箭头迷阵微信小游戏的商业化 Canvas UI 设计、审查与实现规范
+default_prompt: 以资深微信小游戏 UI 设计师视角，为箭头迷阵提供界面设计、布局优化和 Canvas 实现建议，保持线头箭头一体、无交点错觉、小屏文字安全和商业化视觉品质。
