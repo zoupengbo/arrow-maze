@@ -26,7 +26,7 @@ try {
 }
 const statusBarHeight = windowInfo.statusBarHeight || 0;
 const safeTop = Math.max(statusBarHeight, menuButtonRect ? menuButtonRect.bottom : statusBarHeight);
-const topHudY = Math.max(16, safeTop + 8);
+const topHudY = Math.max(44, safeTop + 20);
 const topHudHeight = 76;
 const topHudBottom = topHudY + topHudHeight;
 const canvas = wx.createCanvas();
@@ -199,10 +199,14 @@ class ArrowMazeGame {
     this.level = 1;
     this.hp = MAX_HP;
     this.bestLevel = this.loadBestLevel();
+    this.tutorialSeen = this.loadTutorialSeen();
     this.hintCount = 0;
     this.reviveUsed = false;
     this.levelState = null;
     this.message = "点击开始，把所有线都移出屏幕。";
+    this.tutorialActive = false;
+    this.tutorialStep = 0;
+    this.tutorialTargetId = -1;
     this.flashTimer = 0;
     this.failedPathId = -1;
     this.hintPathId = -1;
@@ -225,10 +229,10 @@ class ArrowMazeGame {
 
   createButtons() {
     return {
-      sound: { x: 66, y: topHudY + 7, w: 46, h: 36 },
+      sound: { x: 76, y: topHudY + 8, w: 44, h: 34 },
       titleStart: { x: 54, y: screenHeight - 204, w: screenWidth - 108, h: 50 },
       titleContinue: { x: 54, y: screenHeight - 142, w: screenWidth - 108, h: 46 },
-      restart: { x: 14, y: topHudY + 7, w: 44, h: 36 },
+      restart: { x: 24, y: topHudY + 8, w: 42, h: 34 },
       hint: { x: 18, y: screenHeight - 88, w: 84, h: 42 },
       revive: { x: 48, y: screenHeight / 2 + 18, w: screenWidth - 96, h: 44 },
       retry: { x: 48, y: screenHeight / 2 + 74, w: screenWidth - 96, h: 44 }
@@ -243,6 +247,28 @@ class ArrowMazeGame {
       return Math.max(1, Number(wx.getStorageSync("arrow_maze_best_level")) || 1);
     } catch (error) {
       return 1;
+    }
+  }
+
+  loadTutorialSeen() {
+    if (!wx.getStorageSync) {
+      return false;
+    }
+    try {
+      return wx.getStorageSync("arrow_maze_tutorial_seen") === 1;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  saveTutorialSeen() {
+    this.tutorialSeen = true;
+    if (!wx.setStorageSync) {
+      return;
+    }
+    try {
+      wx.setStorageSync("arrow_maze_tutorial_seen", 1);
+    } catch (error) {
     }
   }
 
@@ -327,6 +353,7 @@ class ArrowMazeGame {
   loadLevel() {
     this.levelState = createLevel(this.level, this.layout);
     this.hintCount = this.levelState.config.hintCount;
+    this.hp = MAX_HP;
     this.elapsedTime = 0;
     this.failedPathId = -1;
     this.hintPathId = -1;
@@ -335,6 +362,7 @@ class ArrowMazeGame {
     this.refreshMovablePaths();
     const minutes = Math.round(this.getTimeLimit() / 60);
     this.message = `${this.levelState.config.name}关：${minutes} 分钟内把所有线滑出屏幕。`;
+    this.setupTutorial();
   }
 
   restartRun() {
@@ -474,6 +502,26 @@ class ArrowMazeGame {
     }
   }
 
+  setupTutorial() {
+    this.tutorialActive = this.level === 1 && !this.tutorialSeen;
+    this.tutorialStep = this.tutorialActive ? 1 : 0;
+    const clearPath = this.levelState.paths.find((path) => !path.escaped && !path.moving && path.isClear);
+    this.tutorialTargetId = clearPath ? clearPath.id : -1;
+    if (this.tutorialActive && this.tutorialTargetId !== -1) {
+      this.hintPathId = this.tutorialTargetId;
+      this.flashTimer = 999;
+    }
+  }
+
+  dismissTutorial() {
+    this.tutorialActive = false;
+    this.tutorialStep = 0;
+    this.tutorialTargetId = -1;
+    this.hintPathId = -1;
+    this.flashTimer = 0;
+    this.saveTutorialSeen();
+  }
+
   handleTap(x, y) {
     if (this.pointInRect(x, y, this.buttons.sound)) {
       this.sound.toggle();
@@ -512,6 +560,13 @@ class ArrowMazeGame {
       return;
     }
 
+    if (this.tutorialActive) {
+      if (this.tutorialStep === 2) {
+        this.dismissTutorial();
+        return;
+      }
+    }
+
     if (this.pointInRect(x, y, this.buttons.hint)) {
       this.useHint();
       return;
@@ -523,6 +578,10 @@ class ArrowMazeGame {
 
     const path = this.findTouchedPath({ x, y });
     if (!path) {
+      return;
+    }
+    if (this.tutorialActive && this.tutorialStep === 1 && path.id !== this.tutorialTargetId) {
+      this.message = "先点亮色提示的那条线，跟着指引走一步。";
       return;
     }
     this.beginRun(path);
@@ -613,6 +672,12 @@ class ArrowMazeGame {
     this.sound.play("clear");
 
     this.refreshMovablePaths();
+    if (this.tutorialActive && this.tutorialStep === 1 && path.id === this.tutorialTargetId) {
+      this.tutorialStep = 2;
+      this.hintPathId = -1;
+      this.flashTimer = 0;
+      this.message = "做得对，后面继续按这样把所有线滑出去。";
+    }
     const remaining = this.getRemainingCount();
     if (remaining === 0) {
       this.bestLevel = Math.max(this.bestLevel, this.level + 1);
@@ -797,9 +862,9 @@ class ArrowMazeGame {
     ctx.fillStyle = COLORS.subText;
     ctx.fillText(this.levelState.config.name, this.layout.width / 2, y + 34);
 
-    const metricX = this.layout.width - 116;
+    const metricX = this.layout.width - 132;
     drawHudMetric(metricX, y + 12, "剩", `${this.getRemainingCount()}`);
-    drawHudMetric(metricX + 54, y + 12, "时", this.formatTime(this.getRemainingTime()));
+    drawHudMetric(metricX + 58, y + 12, "时", this.formatTime(this.getRemainingTime()));
 
     ctx.textAlign = "center";
     ctx.font = "18px sans-serif";
@@ -1080,10 +1145,57 @@ class ArrowMazeGame {
     drawWrappedText("目标：所有线都滑出屏幕。", textX, y + 54, textWidth, 14, 1);
   }
 
+  drawTutorialOverlay() {
+    if (!this.tutorialActive || this.state !== "playing") {
+      return;
+    }
+
+    ctx.fillStyle = "rgba(8, 10, 22, 0.34)";
+    ctx.fillRect(0, 0, this.layout.width, this.layout.height);
+
+    const board = this.levelState.board;
+    if (this.tutorialStep === 1 && this.tutorialTargetId !== -1) {
+      const target = this.levelState.paths.find((path) => path.id === this.tutorialTargetId);
+      if (target && !target.escaped) {
+        const head = target.points[target.points.length - 1];
+        ctx.save();
+        ctx.strokeStyle = "rgba(126,231,255,0.95)";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, 20, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.strokeStyle = "rgba(126,231,255,0.28)";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(head.x, head.y, 28, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+    }
+
+    const cardY = board.y + board.height + 16;
+    drawGlassPanel(28, cardY, this.layout.width - 56, 96, 22, 0.76);
+    drawSmallBadge(42, cardY + 14, 70, `步骤 ${this.tutorialStep}`, "rgba(120,231,255,0.12)");
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = COLORS.text;
+    ctx.font = "bold 16px sans-serif";
+    const title = this.tutorialStep === 1 ? "先点亮色线头，试着滑出第一条线" : "很好，剩下的线也照这样逐条清空";
+    drawWrappedText(title, 42, cardY + 46, this.layout.width - 84, 20, 2);
+    ctx.font = "12px sans-serif";
+    ctx.fillStyle = COLORS.subText;
+    const detail = this.tutorialStep === 1 ? "规则：前方没被其他线挡住，就能直接滑出屏幕。" : "点任意位置继续，之后就按同样规则完成本关。";
+    drawWrappedText(detail, 42, cardY + 72, this.layout.width - 84, 16, 2);
+  }
+
   drawGameScreen() {
     this.drawTopBarPolished();
     this.drawBoard();
-    this.drawBottomBarPolished();
+    if (!this.tutorialActive) {
+      this.drawBottomBarPolished();
+    }
+    this.drawTutorialOverlay();
   }
 
   drawButton(rect, text, fillStyle, textStyle) {

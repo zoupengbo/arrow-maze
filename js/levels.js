@@ -25,38 +25,6 @@ const HANDCRAFTED_LEVELS = [
       { cells: [[5, 8], [7, 8], [7, 5]], exit: "top" },
       { cells: [[14, 14], [18, 14]], exit: "right" }
     ]
-  },
-  {
-    name: "折返线",
-    hintCount: 2,
-    moveSpeed: 236,
-    paths: [
-      { cells: [[3, 6], [7, 6], [7, 10], [4, 10]], exit: "left" },
-      { cells: [[10, 3], [10, 8], [14, 8], [14, 4]], exit: "top" },
-      { cells: [[15, 6], [18, 6], [18, 10]], exit: "right" },
-      { cells: [[4, 13], [8, 13], [8, 17], [5, 17]], exit: "left" },
-      { cells: [[10, 12], [10, 17], [13, 17], [13, 19]], exit: "bottom" },
-      { cells: [[15, 11], [15, 15], [18, 15]], exit: "right" },
-      { cells: [[5, 3], [5, 5], [2, 5]], exit: "left" },
-      { cells: [[14, 11], [14, 14], [12, 14]], exit: "left" },
-      { cells: [[16, 16], [16, 18]], exit: "bottom" }
-    ]
-  },
-  {
-    name: "分流口",
-    hintCount: 2,
-    moveSpeed: 246,
-    paths: [
-      { cells: [[4, 4], [4, 9], [7, 9], [7, 13]], exit: "bottom" },
-      { cells: [[8, 4], [8, 8], [11, 8], [11, 4]], exit: "top" },
-      { cells: [[14, 4], [14, 8], [18, 8]], exit: "right" },
-      { cells: [[3, 12], [6, 12], [6, 17], [3, 17]], exit: "left" },
-      { cells: [[9, 11], [9, 15], [13, 15], [13, 19]], exit: "bottom" },
-      { cells: [[15, 12], [18, 12], [18, 16]], exit: "right" },
-      { cells: [[11, 10], [13, 10], [13, 5]], exit: "top" },
-      { cells: [[7, 16], [9, 16], [9, 18]], exit: "bottom" },
-      { cells: [[14, 13], [14, 17], [16, 17]], exit: "right" }
-    ]
   }
 ];
 
